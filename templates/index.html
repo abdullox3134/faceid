@@ -14,29 +14,22 @@
             background-color: #f0f0f0;
         }
 
-        form {
+        #camera-container {
+            text-align: center;
             background-color: white;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            width: 320px;
-            text-align: center;
+            width: 90%; /* Increased to 90% of the screen width for a larger view */
+            max-width: 1200px; /* Increased maximum width for larger screens */
         }
 
-        input[type="file"] {
-            margin-bottom: 20px;
-            padding: 5px;
-            width: 100%;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-
-        label {
-            font-weight: bold;
+        video, canvas {
+            width: 100%; /* Set the video to take the full width of the container */
+            height: auto; /* Keep the aspect ratio */
+            border-radius: 8px;
             margin-bottom: 10px;
-            display: block;
-            text-align: left;
-            color: #333;
+            transform: scaleX(-1); /* Flip the video horizontally to correct the mirror effect */
         }
 
         button {
@@ -55,11 +48,45 @@
     </style>
 </head>
 <body>
-    <form action="" method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        <label for="image">Rasmni yuklang:</label>
-        <input type="file" name="image" id="image" required>
-        <button type="submit">Tekshirish</button>
-    </form>
+    <div id="camera-container">
+        <video id="video" autoplay></video>
+        <canvas id="canvas" style="display: none;"></canvas>
+        <button id="capture-button">Suratga olish</button>
+        <form id="upload-form" action="" method="post" enctype="multipart/form-data" style="display: none;">
+            {% csrf_token %}
+            <input type="hidden" name="image" id="image-data">
+            <button type="submit">Tekshirish</button>
+        </form>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const captureButton = document.getElementById('capture-button');
+        const uploadForm = document.getElementById('upload-form');
+        const imageDataInput = document.getElementById('image-data');
+
+        // Access the camera
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                console.error("Error accessing the camera: " + err);
+            });
+
+        // Capture the image from the video stream
+        captureButton.addEventListener('click', () => {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Get the image data and display the form
+            const imageData = canvas.toDataURL('image/png');
+            imageDataInput.value = imageData;
+            uploadForm.style.display = 'block';
+        });
+    </script>
 </body>
 </html>

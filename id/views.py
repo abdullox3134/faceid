@@ -3,10 +3,19 @@ from django.shortcuts import render
 import face_recognition
 import numpy as np
 from PIL import Image
+import base64
+from io import BytesIO
 
-def split_and_compare_faces(image_file):
-    # Rasmni yuklash va o'rtasidan bo'lish
-    image = Image.open(image_file)
+
+def split_and_compare_faces(image_data):
+    # Decode the base64 image data
+    image_data = image_data.split(',')[1]  # Remove the 'data:image/png;base64,' part
+    image_bytes = base64.b64decode(image_data)
+    image = Image.open(BytesIO(image_bytes))
+
+    # Convert the image to RGB format (face_recognition requires 8-bit gray or RGB)
+    image = image.convert("RGB")
+
     width, height = image.size
     left_half = image.crop((0, 0, width // 2, height))
     right_half = image.crop((width // 2, 0, width, height))
@@ -26,8 +35,10 @@ def split_and_compare_faces(image_file):
     if not left_face_location or not right_face_location:
         return None
 
-    left_face_area = (left_face_location[0][2] - left_face_location[0][0]) * (left_face_location[0][1] - left_face_location[0][3])
-    right_face_area = (right_face_location[0][2] - right_face_location[0][0]) * (right_face_location[0][1] - right_face_location[0][3])
+    left_face_area = (left_face_location[0][2] - left_face_location[0][0]) * (
+                left_face_location[0][1] - left_face_location[0][3])
+    right_face_area = (right_face_location[0][2] - right_face_location[0][0]) * (
+                right_face_location[0][1] - right_face_location[0][3])
 
     # Pasport yuzini aniqlash (kichikroq yuz)
     if left_face_area < right_face_area:
@@ -41,10 +52,11 @@ def split_and_compare_faces(image_file):
     match = face_recognition.compare_faces([passport_encoding], other_encoding)
     return match[0]
 
+
 def index(request):
-    if request.method == "POST" and request.FILES.get("image"):
-        image_file = request.FILES["image"]
-        match = split_and_compare_faces(image_file)
+    if request.method == "POST" and request.POST.get("image"):
+        image_data = request.POST["image"]
+        match = split_and_compare_faces(image_data)
         if match is None:
             return JsonResponse({"error": "Yuzlar topilmadi yoki rasmda biror yuz topilmadi"})
         elif match:
