@@ -2,33 +2,53 @@ from django.http import JsonResponse
 from django.shortcuts import render
 import face_recognition
 import numpy as np
+from PIL import Image
 
+def split_and_compare_faces(image_file):
+    # Rasmni yuklash va o'rtasidan bo'lish
+    image = Image.open(image_file)
+    width, height = image.size
+    left_half = image.crop((0, 0, width // 2, height))
+    right_half = image.crop((width // 2, 0, width, height))
 
-def compare_faces(image1_file, image2_file):
-    # Har ikkala rasmni yuklash
-    image1 = face_recognition.load_image_file(image1_file)
-    image2 = face_recognition.load_image_file(image2_file)
+    # Yuzlarni encoding qilish
+    left_encoding = face_recognition.face_encodings(np.array(left_half))
+    right_encoding = face_recognition.face_encodings(np.array(right_half))
 
-    # Rasm ichidagi yuzlarni encoding qilish
-    image1_encoding = face_recognition.face_encodings(image1)
-    image2_encoding = face_recognition.face_encodings(image2)
+    # Agar biror bo'lakda yuz topilmasa
+    if not left_encoding or not right_encoding:
+        return None
 
-    # Agar biror rasmda yuz topilmasa
-    if not image1_encoding or not image2_encoding:
-        return False
+    # Yuzlarni aniqlash va kattaligini hisoblash
+    left_face_location = face_recognition.face_locations(np.array(left_half))
+    right_face_location = face_recognition.face_locations(np.array(right_half))
+
+    if not left_face_location or not right_face_location:
+        return None
+
+    left_face_area = (left_face_location[0][2] - left_face_location[0][0]) * (left_face_location[0][1] - left_face_location[0][3])
+    right_face_area = (right_face_location[0][2] - right_face_location[0][0]) * (right_face_location[0][1] - right_face_location[0][3])
+
+    # Pasport yuzini aniqlash (kichikroq yuz)
+    if left_face_area < right_face_area:
+        passport_encoding = left_encoding[0]
+        other_encoding = right_encoding[0]
+    else:
+        passport_encoding = right_encoding[0]
+        other_encoding = left_encoding[0]
 
     # Yuzlarni solishtirish
-    matches = face_recognition.compare_faces([image1_encoding[0]], image2_encoding[0])
-    return matches[0]
-
+    match = face_recognition.compare_faces([passport_encoding], other_encoding)
+    return match[0]
 
 def index(request):
-    if request.method == "POST" and request.FILES.get("image1") and request.FILES.get("image2"):
-        image1_file = request.FILES["image1"]
-        image2_file = request.FILES["image2"]
-        match = compare_faces(image1_file, image2_file)
-        if match:
-            return JsonResponse({"message": "Muvofaqqiyatli tanildi!"})
+    if request.method == "POST" and request.FILES.get("image"):
+        image_file = request.FILES["image"]
+        match = split_and_compare_faces(image_file)
+        if match is None:
+            return JsonResponse({"error": "Yuzlar topilmadi yoki rasmda biror yuz topilmadi"})
+        elif match:
+            return JsonResponse({"message": "Ikkala yuz bir xil odamga tegishli!"})
         else:
             return JsonResponse({"error": "Bu boshqa odam yoki boshqattan urinib ko'ring!"})
     return render(request, "index.html")

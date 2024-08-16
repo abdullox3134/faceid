@@ -57,13 +57,9 @@
 <body>
     <form action="" method="post" enctype="multipart/form-data">
         {% csrf_token %}
-        <label for="image1">Birinchi rasmni yuklang:</label>
-        <input type="file" name="image1" id="image1" required>
-
-        <label for="image2">Ikkinchi rasmni yuklang:</label>
-        <input type="file" name="image2" id="image2" required>
-
-        <button type="submit">Solishtirish</button>
+        <label for="image">Rasmni yuklang:</label>
+        <input type="file" name="image" id="image" required>
+        <button type="submit">Tekshirish</button>
     </form>
 </body>
 </html>
