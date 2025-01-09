@@ -1,94 +1,147 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yuzni Solishtirish</title>
-    <style>
-        body, html {
-            height: 100%;
-            margin: 0;
-<!--            display: flex;-->
-            justify-content: center;
-            align-items: center;
-            background-color: #f0f0f0;
-        }
-
-        #camera-container {
-            text-align: center;
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            height: 100vh; /* Height set to 100% of the viewport */
-            max-width: 100%;
-            box-sizing: border-box; /* Include padding in width/height */
-        }
-
-        video, canvas {
-            width: 100%; /* Full width of the container */
-            height: 90vh ; /* Maintain aspect ratio */
-            border-radius: 8px;
-            margin-bottom: 10px;
-            transform: scaleX(-1); /* Mirror the video */
-        }
-
-        button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            width: 100%;
-        }
-
-        button:hover {
-            background-color: #0056b3;
-        }
-    </style>
-</head>
 <body>
-    <div id="camera-container">
-        <video id="video" autoplay></video>
+    <div id="camera-container" style="text-align: center; margin-top: 20px;">
+        <video id="video" autoplay style="border: 2px solid #28a745; border-radius: 10px; width: 50%; transform: scaleX(-1);"></video>
         <canvas id="canvas" style="display: none;"></canvas>
-        <button id="capture-button">Suratga olish</button>
+
+        <button id="capture-face" class="green-button">1-chi rasm: Yuzni olish</button>
+        <button id="capture-passport" class="green-button" style="display: none;">2-chi rasm: Pasportni olish</button>
+
         <form id="upload-form" action="" method="post" enctype="multipart/form-data" style="display: none;">
             {% csrf_token %}
-            <input type="hidden" name="image" id="image-data">
-            <button type="submit">Tekshirish</button>
+            <input type="hidden" name="face_image" id="face-data">
+            <input type="hidden" name="passport_image" id="passport-data">
+            <button type="submit" class="green-button">Tekshirish</button>
         </form>
     </div>
+
+    <style>
+        .green-button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 15px;
+            transition: transform 0.2s ease-in-out, background-color 0.3s;
+        }
+        .green-button:hover {
+            background-color: #218838;
+            transform: scale(1.1);
+        }
+        .green-button:active {
+            background-color: #1e7e34;
+        }
+        #camera-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+    </style>
 
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
-        const captureButton = document.getElementById('capture-button');
+        const captureFaceButton = document.getElementById('capture-face');
+        const capturePassportButton = document.getElementById('capture-passport');
         const uploadForm = document.getElementById('upload-form');
-        const imageDataInput = document.getElementById('image-data');
+        const faceDataInput = document.getElementById('face-data');
+        const passportDataInput = document.getElementById('passport-data');
+        const context = canvas.getContext('2d');
 
-        // Access the camera
+        let faceDetected = false;
+        let countdown = 3;
+        let countdownInterval;
+
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(stream => {
                 video.srcObject = stream;
             })
-            .catch(err => {
-                console.error("Error accessing the camera: " + err);
-            });
+            .catch(err => console.error("Kamera ishlashida xatolik: " + err));
 
-        // Capture the image from the video stream
-        captureButton.addEventListener('click', () => {
-            const context = canvas.getContext('2d');
+        captureFaceButton.addEventListener('click', () => {
+            // Canvas o'lchamlarini video o'lchamlariga moslashtirish
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Get the image data and display the form
-            const imageData = canvas.toDataURL('image/png');
-            imageDataInput.value = imageData;
+            // Yuz uchun dumaloq chiziq
+            const faceRadius = 100;
+            const faceX = canvas.width / 4;
+            const faceY = canvas.height / 2;
+            context.beginPath();  // Chiziqni boshlash
+            context.arc(faceX, faceY, faceRadius, 0, Math.PI * 2);
+            context.lineWidth = 5;
+            context.strokeStyle = 'red';  // Chiziq rangi
+            context.stroke();
+
+            faceDataInput.value = canvas.toDataURL('image/png');
+            captureFaceButton.style.display = 'none';
+            capturePassportButton.style.display = 'inline-block';
+
+            // Yuzni aniqlashni boshlash
+            detectFace();
+        });
+
+        capturePassportButton.addEventListener('click', () => {
+            // Canvas o'lchamlarini video o'lchamlariga moslashtirish
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            passportDataInput.value = canvas.toDataURL('image/png');
+            capturePassportButton.style.display = 'none';
             uploadForm.style.display = 'block';
         });
+
+        // Yuzni aniqlash va 3 soniya sanash
+        function detectFace() {
+            // Har 100msda yuzni tekshirish
+            setInterval(() => {
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const faceRadius = 100;
+                const faceX = canvas.width / 4;
+                const faceY = canvas.height / 2;
+
+                // Yuzni aniqlash logikasi (Bu joyda haqiqiy yuzni aniqlash funksiya qo'shilishi kerak)
+                faceDetected = true; // Hozircha faqat test sifatida
+
+                if (faceDetected) {
+                    context.beginPath();
+                    context.arc(faceX, faceY, faceRadius, 0, Math.PI * 2);
+                    context.lineWidth = 5;
+                    context.strokeStyle = 'green'; // Yashil rangda chiziq
+                    context.stroke();
+
+                    if (!countdownInterval) {
+                        startCountdown();
+                    }
+                }
+            }, 100);
+        }
+
+        // 3 sekund sanash funksiyasi
+        function startCountdown() {
+            countdownInterval = setInterval(() => {
+                console.log("Time remaining: " + countdown);
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                    takeSnapshot();
+                } else {
+                    countdown--;
+                }
+            }, 1000);
+        }
+
+        // Rasmni avtomatik olish
+        function takeSnapshot() {
+            // Canvasni yangilash va rasmni olish
+            const snapshotData = canvas.toDataURL('image/png');
+            faceDataInput.value = snapshotData;
+            console.log("Rasm olingan!");
+        }
     </script>
 </body>
-</html>
